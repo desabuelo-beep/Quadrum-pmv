@@ -1,5 +1,5 @@
 """
-QUADRUM v1.0 — Sistema de Integridad Programática
+QUADRUM v1.0 — Sistema Integral de Auditoría y Planificación SIAP-ICPI
 Protocolo ALFARO VIRTUS · GAD Municipal de Montecristi
 app.py — Versión Definitiva Blindada
 Columnas y skiprows verificados directamente desde el Excel.
@@ -152,7 +152,7 @@ with st.sidebar:
 # ═══════════════════════════════════════════════════════
 st.markdown(
     '<div class="banner">'
-    "<h1>🏛️ QUADRUM v1.0 — Sistema de Integridad Programática</h1>"
+    "<h1>🏛️ QUADRUM v1.0 — Sistema Integral de Auditoría y Planificación SIAP-ICPI</h1>"
     "<p>GAD Municipal de Montecristi &nbsp;·&nbsp; "
     "Protocolo de Auditoría Forense ALFARO VIRTUS &nbsp;·&nbsp; SIAP-ICPI</p>"
     "</div>",
@@ -351,9 +351,13 @@ with tab2:
 
             cf1, cf2 = st.columns(2)
             with cf1:
-                ejes_uniq = ["Todos"] + sorted(
-                    df_m5_clean["EJE ESTRATÉGICO"].dropna().unique().tolist()
-                )
+                # Convertir todo a str, filtrar valores numéricos/basura antes de ordenar
+                ejes_vals = [
+                    str(v).strip()
+                    for v in df_m5_clean["EJE ESTRATÉGICO"].dropna().unique()
+                    if str(v).strip() not in ("0", "nan", "", "EJE ESTRATÉGICO")
+                ]
+                ejes_uniq = ["Todos"] + sorted(ejes_vals)
                 eje_sel = st.selectbox("🔍 Filtrar por Eje:", ejes_uniq)
             with cf2:
                 vi_sel = st.selectbox(
@@ -363,7 +367,9 @@ with tab2:
 
             df_show = df_m5_clean.copy()
             if eje_sel != "Todos":
-                df_show = df_show[df_show["EJE ESTRATÉGICO"] == eje_sel]
+                df_show = df_show[
+                    df_show["EJE ESTRATÉGICO"].astype(str).str.strip() == eje_sel
+                ]
             if vi_sel == "Vi = 1 (Con evidencia)":
                 df_show = df_show[
                     df_show["Vi (Verificación)"].astype(str).str.strip() == "1"
