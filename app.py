@@ -2,41 +2,55 @@ import streamlit as st
 import pandas as pd
 import os
 
+# CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="QUADRUM v1.0 | Montecristi", layout="wide")
 
-# Nombre exacto del archivo
+st.title("🏛️ QUADRUM v1.0 | Dashboard Forense")
+st.markdown("---")
+
+# 1. VERIFICACIÓN DE ARCHIVOS
 EXCEL_FILE = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
 
-# SIDEBAR CORPORATIVO
-st.sidebar.title("🏛️ QUADRUM v1.0")
-st.sidebar.markdown("**Protocolo Alfaro Virtus**")
-st.sidebar.markdown("---")
-menu = st.sidebar.radio("Navegación:", ["📊 Dashboard Ejecutivo", "⚖️ Auditoría por Metas", "📥 Ingesta Forense"])
+if not os.path.exists(EXCEL_FILE):
+    st.error(f"❌ No se encuentra el archivo '{EXCEL_FILE}' en GitHub.")
+    st.stop()
 
-if os.path.exists(EXCEL_FILE):
-    # Carga de hojas
-    df_res = pd.read_excel(EXCEL_FILE, sheet_name="DATA-RESULTADOS", skiprows=3)
-    df_ejes = pd.read_excel(EXCEL_FILE, sheet_name="DATA-EJES", skiprows=1)
-    
-    if menu == "📊 Dashboard Ejecutivo":
-        st.title("Panel de Integridad Programática")
-        st.success("✅ Base de Datos Conectada exitosamente")
+@st.cache_data
+def load_data(sheet, skip):
+    try:
+        return pd.read_excel(EXCEL_FILE, sheet_name=sheet, skiprows=skip)
+    except Exception as e:
+        st.warning(f"No se pudo cargar la hoja {sheet}: {e}")
+        return None
+
+# CARGA DE DATOS
+df_res = load_data("DATA-RESULTADOS", 3)
+df_eje = load_data("DATA-EJES", 1)
+
+# INTERFAZ PRINCIPAL
+if df_res is not None:
+    # MÉTRICAS MAESTRAS
+    c1, c2, c3 = st.columns(3)
+    c1.metric("ICPI GLOBAL", "38.28%", "-53.97 pp")
+    c2.metric("Nivel AVEP", "Transición Crítica", "🟡")
+    c3.metric("Metas Auditadas", "20", "n=20")
+
+    st.markdown("---")
+
+    # SOLUCIÓN AL ERROR 'EJE' (Detección automática de columnas)
+    st.subheader("📊 Análisis Sectorial")
+    if df_eje is not None:
+        # Buscamos las columnas correctas sin importar si tienen espacios o mayúsculas
+        df_eje.columns = [str(c).strip().upper() for c in df_eje.columns]
         
-        # MÉTRICAS
-        c1, c2, c3 = st.columns(3)
-        c1.metric("ICPI Global", "38.28%", "-53.97 pp", delta_color="inverse")
-        c2.metric("Brecha vs SIGAD", "29.22%", "Sobrestimación", delta_color="inverse")
-        c3.metric("Nivel AVEP", "Transición Crítica", "🟡")
-        
-        st.markdown("---")
-        st.subheader("Análisis de Cumplimiento por Eje Estratégico")
-        # Gráfico de Barras Real
-        st.bar_chart(df_ejes.set_index('EJE')['ICPI EJE'])
+        if 'EJE' in df_eje.columns and 'ICPI EJE' in df_eje.columns:
+            st.bar_chart(df_eje.set_index('EJE')['ICPI EJE'])
+        else:
+            st.warning("Estructura de columnas en 'DATA-EJES' no reconocida. Mostrando tabla cruda:")
+            st.dataframe(df_eje)
 
-    elif menu == "⚖️ Auditoría por Metas":
-        st.title("Motor SIAP-ICPI | Desglose Forense")
-        st.write("Variables: $P_i \times R_i \times V_i \times T_i \times C_i$")
-        st.dataframe(df_res[['MÉTRICA', 'VALOR', 'NOTA / INTERPRETACIÓN']])
-
+    # TABLA DE AUDITORÍA
+    st.subheader("⚖️ Matriz de Resultados (DATA-RESULTADOS)")
+    st.dataframe(df_res)
 else:
-    st.error("Archivo no encontrado. Verifica que el Excel esté en GitHub.")
+    st.error("Error crítico: No se pudieron procesar los datos del Excel.")
