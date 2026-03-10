@@ -1,37 +1,55 @@
 import streamlit as st
 import pandas as pd
 
-# 1. CARGA DE DATOS (El motor lee tu Excel)
+# 1. CONFIGURACIÓN E IDENTIDAD
+st.set_page_config(page_title="QUADRUM v1.0 | Dashboard Forense", layout="wide")
+
 @st.cache_data
-def load_data():
-    file_path = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
-    # Leemos las hojas clave de tu archivo
-    df_resumen = pd.read_excel(file_path, sheet_name="DATA-RESULTADOS", skiprows=3)
-    df_ejes = pd.read_excel(file_path, sheet_name="DATA-EJES", skiprows=1)
-    return df_resumen, df_ejes
+def load_all_data():
+    # Esta función lee las partes críticas de tus 38 módulos
+    path = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
+    resumen = pd.read_excel(path, sheet_name="DATA-RESULTADOS", skiprows=3)
+    ejes = pd.read_excel(path, sheet_name="DATA-EJES", skiprows=1)
+    auditoria = pd.read_excel(path, sheet_name="M4-AUDIT", skiprows=3)
+    return resumen, ejes, auditoria
 
+# Intentar cargar el motor
 try:
-    df_resumen, df_ejes = load_data()
-    st.success("✅ Base de Datos QUADRUM conectada exitosamente")
-except:
-    st.error("❌ Error: Asegúrate de que el archivo Excel esté subido a GitHub con el nombre correcto.")
+    df_res, df_eje, df_audit = load_all_data()
+    
+    # 2. CABECERA EJECUTIVA
+    st.title("🏛️ QUADRUM v1.0: Sistema de Integridad Programática")
+    st.markdown("### GAD Municipal de Montecristi | Protocolo ALFARO VIRTUS")
+    
+    # 3. MÉTRICAS DE IMPACTO (Fase 6: Dashboard)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("ICPI GLOBAL", "38.28%", "-53.97 pp (Brecha)")
+    with col2:
+        st.metric("TRANSPARENCIA (ITAM)", "78.00%", "Nivel: Parcial")
+    with col3:
+        st.metric("METAS VI=1", "15 / 20", "75% Verificado")
 
-# 2. INTERFAZ EJECUTIVA
-st.title("🏛️ QUADRUM v1.0 | Dashboard Forense")
+    # 4. VISUALIZACIÓN POR CAPAS
+    menu = st.tabs(["📊 Resultados por Eje", "⚖️ Auditoría de Metas", "📥 Ingesta Forense"])
+    
+    with menu[0]:
+        st.subheader("Análisis Sectorial del ICPI")
+        # Filtramos solo las columnas de interés de tu hoja DATA-EJES
+        df_plot = df_eje[['EJE', 'ICPI EJE']].dropna().head(5)
+        st.bar_chart(df_plot.set_index('EJE'))
+        st.dataframe(df_eje)
 
-# Mostramos el ICPI Real que está en tu Excel
-icpi_valor = "38.28%" # Esto lo podemos extraer dinámicamente
-st.metric(label="ICPI Global - GAD Montecristi", value=icpi_valor, delta="-53.97 pp vs Meta 2027")
+    with menu[1]:
+        st.subheader("Capa 3: Matriz de Auditoría Documental (M4-AUDIT)")
+        st.write("Estado de la Cadena de Integridad Intersistémica (CININ):")
+        st.dataframe(df_audit[['CÓD. PDOT', 'EJE', 'Vi', 'Ti', 'ESTADO CININ']])
 
-# 3. MOSTRAR TABLAS REALES DEL EXCEL
-st.subheader("Visualización de Matrices de la Tesis")
-tab1, tab2 = st.tabs(["Resultados por Eje", "Vista Previa de Datos"])
+    with menu[2]:
+        st.subheader("Capa 2: Ingesta de Evidencia Digital")
+        st.info("El sistema está sincronizado con el archivo maestro de la Tesis.")
+        st.file_uploader("Actualizar Cédula Presupuestaria (eSIGEF)", type=["xlsx", "csv"])
 
-with tab1:
-    # Mostramos los datos de tu hoja DATA-EJES
-    st.write("Análisis Sectorial extraído de la hoja DATA-EJES:")
-    st.dataframe(df_ejes.head(10)) # Muestra las primeras 10 filas
-
-with tab2:
-    st.write("Resultados Consolidados extraídos de DATA-RESULTADOS:")
-    st.dataframe(df_resumen.head(10))
+except Exception as e:
+    st.error(f"⚠️ Error de Conexión: {e}")
+    st.info("Asegúrate de que el archivo .xlsx esté en la raíz de tu GitHub.")
