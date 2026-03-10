@@ -1,64 +1,37 @@
 import streamlit as st
 import pandas as pd
 
-# CONFIGURACIÓN ESTÉTICA (Capa de Presentación)
-st.set_page_config(page_title="QUADRUM v1.0 | Montecristi", layout="wide")
+# 1. CARGA DE DATOS (El motor lee tu Excel)
+@st.cache_data
+def load_data():
+    file_path = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
+    # Leemos las hojas clave de tu archivo
+    df_resumen = pd.read_excel(file_path, sheet_name="DATA-RESULTADOS", skiprows=3)
+    df_ejes = pd.read_excel(file_path, sheet_name="DATA-EJES", skiprows=1)
+    return df_resumen, df_ejes
 
-# ESTILO CORPORATIVO
-st.markdown("""
-    <style>
-    .main { background-color: #f5f7f9; }
-    .stMetric { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    </style>
-    """, unsafe_allow_html=True)
+try:
+    df_resumen, df_ejes = load_data()
+    st.success("✅ Base de Datos QUADRUM conectada exitosamente")
+except:
+    st.error("❌ Error: Asegúrate de que el archivo Excel esté subido a GitHub con el nombre correcto.")
 
-# SIDEBAR (Navegación)
-st.sidebar.title("🏛️ QUADRUM v1.0")
-st.sidebar.markdown("**Protocolo Alfaro Virtus**")
-st.sidebar.markdown("---")
-menu = st.sidebar.selectbox("Capa del Sistema:", ["📊 Dashboard Ejecutivo", "📥 Ingesta e eSIGEF", "⚖️ Motor SIAP-ICPI"])
+# 2. INTERFAZ EJECUTIVA
+st.title("🏛️ QUADRUM v1.0 | Dashboard Forense")
 
-# DATOS REALES DE MONTECRISTI (Pre-cargados para el Jurado)
-if menu == "📊 Dashboard Ejecutivo":
-    st.title("Panel de Integridad Programática")
-    st.subheader("GAD Municipal de Montecristi | Período 2024")
-    
-    # MÉTRICAS CLAVE (Inyectando tus datos reales)
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("ICPI Global", "38.28%", "-53.97 pp", delta_color="inverse")
-    col2.metric("Brecha vs SIGAD", "29.22%", "Sobrestimación", delta_color="inverse")
-    col3.metric("Nivel Institucional", "Transición Crítica", "🟡")
-    col4.metric("Metas Auditadas", "20", "n=20")
+# Mostramos el ICPI Real que está en tu Excel
+icpi_valor = "38.28%" # Esto lo podemos extraer dinámicamente
+st.metric(label="ICPI Global - GAD Montecristi", value=icpi_valor, delta="-53.97 pp vs Meta 2027")
 
-    st.markdown("---")
-    
-    # GRÁFICO DE RESULTADOS POR EJE
-    st.subheader("Análisis por Eje Estratégico")
-    # Datos extraídos de tu hoja DATA-EJES
-    data_ejes = {
-        'Eje': ['Territorial', 'Social', 'Ambiental', 'Institucional'],
-        'ICPI (%)': [25.76, 51.68, 66.30, 60.15]
-    }
-    df_ejes = pd.DataFrame(data_ejes)
-    st.bar_chart(df_ejes.set_index('Eje'))
+# 3. MOSTRAR TABLAS REALES DEL EXCEL
+st.subheader("Visualización de Matrices de la Tesis")
+tab1, tab2 = st.tabs(["Resultados por Eje", "Vista Previa de Datos"])
 
-elif menu == "📥 Ingesta e eSIGEF":
-    st.title("Módulo de Ingesta Forense")
-    st.info("Cargue las Cédulas Presupuestarias del eSIGEF para validar la variable de Temporalidad (Ti).")
-    
-    uploaded_file = st.file_uploader("Arrastre aquí el archivo .csv o .xlsx del eSIGEF", type=['csv', 'xlsx'])
-    if uploaded_file:
-        st.success("Archivo verificado bajo Protocolo CININ. Procesando variables...")
+with tab1:
+    # Mostramos los datos de tu hoja DATA-EJES
+    st.write("Análisis Sectorial extraído de la hoja DATA-EJES:")
+    st.dataframe(df_ejes.head(10)) # Muestra las primeras 10 filas
 
-elif menu == "⚖️ Motor SIAP-ICPI":
-    st.title("Ecuación Canónica de Integridad")
-    st.latex(r'''ICPI = \frac{\sum (P_i \times R_i \times V_i \times E_i \times T_i \times C_i)}{\sum (P_i \times R_i)}''')
-    
-    st.write("### Auditoría de Metas Críticas")
-    # Ejemplo de tabla de tu hoja M4-AUDIT
-    metas = [
-        {"Meta": "Agua Potable - Acueducto", "Pi": 0.33, "Vi": 1, "Ti": 0.25, "Estado": "🔴 Crítico"},
-        {"Meta": "Alcantarillado Eloy Alfaro", "Pi": 0.17, "Vi": 1, "Ti": 0.65, "Estado": "🟡 En proceso"},
-        {"Meta": "Centro de Salud Tipo C", "Pi": 0.20, "Vi": 0, "Ti": 0.00, "Estado": "⬛ Ruptura"}
-    ]
-    st.table(metas)
+with tab2:
+    st.write("Resultados Consolidados extraídos de DATA-RESULTADOS:")
+    st.dataframe(df_resumen.head(10))
