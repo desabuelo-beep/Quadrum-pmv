@@ -2,33 +2,41 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="QUADRUM v1.0", layout="wide")
+st.set_page_config(page_title="QUADRUM v1.0 | Montecristi", layout="wide")
 
-# Nombre exacto que debe tener el archivo en GitHub
-NOMBRE_ARCHIVO = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
+# Nombre exacto del archivo
+EXCEL_FILE = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
 
-st.title("🏛️ QUADRUM v1.0 | Dashboard Forense")
+# SIDEBAR CORPORATIVO
+st.sidebar.title("🏛️ QUADRUM v1.0")
+st.sidebar.markdown("**Protocolo Alfaro Virtus**")
+st.sidebar.markdown("---")
+menu = st.sidebar.radio("Navegación:", ["📊 Dashboard Ejecutivo", "⚖️ Auditoría por Metas", "📥 Ingesta Forense"])
 
-# 1. VERIFICAMOS SI EL ARCHIVO EXISTE
-if os.path.exists(NOMBRE_ARCHIVO):
-    try:
-        # Cargamos los datos
-        df_resumen = pd.read_excel(NOMBRE_ARCHIVO, sheet_name="DATA-RESULTADOS", skiprows=3)
+if os.path.exists(EXCEL_FILE):
+    # Carga de hojas
+    df_res = pd.read_excel(EXCEL_FILE, sheet_name="DATA-RESULTADOS", skiprows=3)
+    df_ejes = pd.read_excel(EXCEL_FILE, sheet_name="DATA-EJES", skiprows=1)
+    
+    if menu == "📊 Dashboard Ejecutivo":
+        st.title("Panel de Integridad Programática")
+        st.success("✅ Base de Datos Conectada exitosamente")
         
-        st.success(f"✅ Conectado a la Base de Datos: {NOMBRE_ARCHIVO}")
+        # MÉTRICAS
+        c1, c2, c3 = st.columns(3)
+        c1.metric("ICPI Global", "38.28%", "-53.97 pp", delta_color="inverse")
+        c2.metric("Brecha vs SIGAD", "29.22%", "Sobrestimación", delta_color="inverse")
+        c3.metric("Nivel AVEP", "Transición Crítica", "🟡")
         
-        # Dashboard Principal
-        col1, col2 = st.columns(2)
-        col1.metric("ICPI Global", "38.28%", "-53.97 pp")
-        col2.metric("Estado CININ", "Transición Crítica", "🟡")
-        
-        st.subheader("Vista Previa de la Auditoría (DATA-RESULTADOS)")
-        st.dataframe(df_resumen.head(15))
-        
-    except Exception as e:
-        st.error(f"❌ Error al leer las hojas del Excel: {e}")
-        st.info("Revisa que las pestañas se llamen exactamente 'DATA-RESULTADOS'.")
+        st.markdown("---")
+        st.subheader("Análisis de Cumplimiento por Eje Estratégico")
+        # Gráfico de Barras Real
+        st.bar_chart(df_ejes.set_index('EJE')['ICPI EJE'])
+
+    elif menu == "⚖️ Auditoría por Metas":
+        st.title("Motor SIAP-ICPI | Desglose Forense")
+        st.write("Variables: $P_i \times R_i \times V_i \times T_i \times C_i$")
+        st.dataframe(df_res[['MÉTRICA', 'VALOR', 'NOTA / INTERPRETACIÓN']])
+
 else:
-    st.error(f"❌ ARCHIVO NO ENCONTRADO: '{NOMBRE_ARCHIVO}'")
-    st.warning("⚠️ Instrucción: Ve a GitHub y sube el Excel con ese nombre exacto. Si el nombre es distinto, el sistema no lo verá.")
-    st.info("Archivos detectados en el servidor actualmente: " + str(os.listdir()))
+    st.error("Archivo no encontrado. Verifica que el Excel esté en GitHub.")
