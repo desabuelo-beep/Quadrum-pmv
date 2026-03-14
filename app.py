@@ -81,17 +81,27 @@ EXCEL_FILE = "SIAP-ICPI_VERSION_EJECUTIVA.xlsx"
 def cargar_hoja_raw(nombre_hoja: str, nrows: int = None):
     """
     Carga una hoja SIN encabezados (header=None) para inspección fila a fila.
+    Busca primero coincidencia EXACTA (case-insensitive) y solo si no
+    encuentra, busca coincidencia parcial — evita colisiones como
+    DATA-SIGAD vs DATA-SIGAD-TIMES.
     Devuelve None si falla — nunca lanza excepción.
     """
     if not os.path.exists(EXCEL_FILE):
         return None
     try:
         xls = pd.ExcelFile(EXCEL_FILE)
+        _target = nombre_hoja.strip().upper()
+        # 1️⃣  Coincidencia exacta (prioritaria)
         hoja_real = next(
-            (h for h in xls.sheet_names
-             if nombre_hoja.strip().upper() in h.strip().upper()),
+            (h for h in xls.sheet_names if h.strip().upper() == _target),
             None,
         )
+        # 2️⃣  Coincidencia parcial solo si no hubo exacta
+        if hoja_real is None:
+            hoja_real = next(
+                (h for h in xls.sheet_names if _target in h.strip().upper()),
+                None,
+            )
         if hoja_real is None:
             return None
         kwargs = dict(sheet_name=hoja_real, header=None)
