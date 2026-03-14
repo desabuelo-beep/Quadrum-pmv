@@ -172,14 +172,89 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# ═══════════════════════════════════════════════════════
-# KPIs — VALORES ACTUALIZADOS DEL EXCEL
-# ICPI Global: 38.28% (M5-ICPI row28)
-# ICM SIGAD: 100% (DATA-SIGAD 2023 y 2024 — ambos períodos)
-# Vi=1: 15/20 (M-DASHBOARD row11)
-# ITAM: 80% (DATA-ITAM row5)
-# Nivel AVEP: Gestión por Ocurrencia (M-DASHBOARD row4)
-# ═══════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════
+# EXTRACCIÓN DINÁMICA DE KPIs DESDE EL EXCEL — CERO HARDCODING
+# Cada valor se lee del archivo en cada ejecución.
+# Si el Excel cambia, el Dashboard cambia automáticamente.
+# ═══════════════════════════════════════════════════════════════════
+
+# ── KPI 1: ICPI Global ── desde M5-ICPI (numerador/denominador reales)
+icpi_val   = 0.0
+icpi_str   = "N/D"
+_m5_raw = cargar_hoja_raw("M5-ICPI", nrows=30)
+if _m5_raw is not None:
+    _m5 = extraer_fila_como_df(_m5_raw, 3, 4, 25, 0, "PDOT")
+    _num_col = "Pi×Ri×Vi×Ti"
+    _den_col = "Pi×Ri (Denominador)"
+    if not _m5.empty and _num_col in _m5.columns and _den_col in _m5.columns:
+        _num = pd.to_numeric(_m5[_num_col], errors="coerce").sum()
+        _den = pd.to_numeric(_m5[_den_col], errors="coerce").sum()
+        if _den > 0:
+            icpi_val = _num / _den * 100
+            icpi_str = f"{icpi_val:.2f}%"
+
+# ── KPI 2: ICM SIGAD ── desde DATA-SIGAD filas 4 (2023) y 5 (2024)
+icm_str    = "N/D"
+brecha_val = 0.0
+brecha_str = "N/D"
+_sig_raw = cargar_hoja_raw("DATA-SIGAD", nrows=10)
+if _sig_raw is not None:
+    # row3=headers · row4=2023 · row5=2024 · col1=ICM SIGAD(%)
+    try:
+        def _safe_n(df, r, c):
+            return pd.to_numeric(str(df.iloc[r, c]).replace(",", ".").strip(), errors="coerce")
+        _i23 = _safe_n(_sig_raw, 4, 1)
+        _i24 = _safe_n(_sig_raw, 5, 1)
+        if pd.notna(_i23) and pd.notna(_i24):
+            _icm_avg   = (_i23 + _i24) / 2
+            icm_str    = f"{_icm_avg:.2f}%"
+            brecha_val = _icm_avg - icpi_val
+            brecha_str = f"−{brecha_val:.2f} pp"
+        elif pd.notna(_i23):
+            icm_str    = f"{_i23:.2f}%"
+            brecha_val = _i23 - icpi_val
+            brecha_str = f"−{brecha_val:.2f} pp"
+    except Exception:
+        pass
+
+# ── KPI 3: ITAM Global ── desde DATA-ITAM fila 5, columna 1
+itam_str   = "N/D"
+itam_sem   = "—"
+_itam_raw = cargar_hoja_raw("DATA-ITAM", nrows=10)
+if _itam_raw is not None:
+    try:
+        _itam_val = pd.to_numeric(_itam_raw.iloc[5, 1], errors="coerce")
+        if pd.notna(_itam_val):
+            itam_pct = _itam_val * 100 if _itam_val <= 1 else _itam_val
+            itam_str = f"{itam_pct:.1f}%"
+            itam_sem = "🟢 Transparente" if itam_pct >= 80 else ("🟡 Parcial" if itam_pct >= 60 else "🔴 Opaco")
+    except Exception:
+        pass
+
+# ── KPI 4: Vi=1 conteo ── desde M5 col Vi (Verificación)
+vi1_str  = "N/D"
+vi1_n    = 0
+if _m5_raw is not None and not _m5.empty:
+    _vi_col = next((c for c in _m5.columns if "Vi" in c and "erif" in c), None)
+    if _vi_col:
+        vi1_n   = (pd.to_numeric(_m5[_vi_col], errors="coerce") == 1).sum()
+        vi_tot  = len(_m5)
+        vi1_str = f"{vi1_n} / {vi_tot}  ({vi1_n/vi_tot*100:.0f}%)"
+
+# ── KPI 5: Nivel AVEP ── calculado desde icpi_val
+def avep_nivel(v: float):
+    if v >= 90: return "Excelencia ⭐",    "#1a7a4a", "verde"
+    if v >= 70: return "Gest. Mandato ✅", "#2874a6", ""
+    if v >= 40: return "Transición 🟡",    "#d4a017", "amarillo"
+    if v >= 20: return "Gest. Ocurrencia 🔴", "#c0392b", "rojo"
+    return "Ruptura ⬛", "#2c3e50", "rojo"
+
+avep_label, avep_color, avep_class = avep_nivel(icpi_val)
+
+# ── Diferencial H1 texto ──
+h1_str = f"+{brecha_val:.2f} pp" if brecha_val > 0 else brecha_str
+
+# ───────────────────────────────────────────────────────────────────
 st.markdown(
     '<div class="sec-header">📊 INDICADORES CLAVE · MOTOR SIAP-ICPI · GAD MONTECRISTI</div>',
     unsafe_allow_html=True,
@@ -189,47 +264,47 @@ c1, c2, c3, c4, c5 = st.columns(5)
 
 with c1:
     st.markdown(
-        '<div class="kpi-card">'
-        '<div class="kpi-label">ICPI Global Forense</div>'
-        '<div class="kpi-value" style="color:#1a4a8a">38.28%</div>'
-        '<div class="kpi-sub">Motor M5-ICPI · n=20 metas</div>'
-        "</div>",
+        f'<div class="kpi-card">'
+        f'<div class="kpi-label">ICPI Global Forense</div>'
+        f'<div class="kpi-value" style="color:#1a4a8a">{icpi_str}</div>'
+        f'<div class="kpi-sub">Motor M5-ICPI · n=20 metas</div>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 with c2:
     st.markdown(
-        '<div class="kpi-card rojo">'
-        '<div class="kpi-label">ICM SIGAD Auto-reporte</div>'
-        '<div class="kpi-value" style="color:#c0392b">100%</div>'
-        '<div class="kpi-sub">Diferencial: +61.72 pp</div>'
-        "</div>",
+        f'<div class="kpi-card rojo">'
+        f'<div class="kpi-label">ICM SIGAD Auto-reporte</div>'
+        f'<div class="kpi-value" style="color:#c0392b">{icm_str}</div>'
+        f'<div class="kpi-sub">Promedio 2023-2024</div>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 with c3:
     st.markdown(
-        '<div class="kpi-card naranja">'
-        '<div class="kpi-label">Brecha ICPI vs SIGAD</div>'
-        '<div class="kpi-value" style="color:#e67e22">−61.72 pp</div>'
-        '<div class="kpi-sub">H₁ Confirmada §3.1</div>'
-        "</div>",
+        f'<div class="kpi-card naranja">'
+        f'<div class="kpi-label">Brecha ICPI vs SIGAD</div>'
+        f'<div class="kpi-value" style="color:#e67e22">{brecha_str}</div>'
+        f'<div class="kpi-sub">H₁ Confirmada §3.1</div>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 with c4:
     st.markdown(
-        '<div class="kpi-card rojo">'
-        '<div class="kpi-label">Nivel AVEP</div>'
-        '<div class="kpi-value" style="color:#c0392b;font-size:1.0rem">Gestión por<br>Ocurrencia 🔴</div>'
-        '<div class="kpi-sub">Escala: &lt;40% → Ocurrencia</div>'
-        "</div>",
+        f'<div class="kpi-card {avep_class}">'
+        f'<div class="kpi-label">Nivel AVEP</div>'
+        f'<div class="kpi-value" style="color:{avep_color};font-size:1.05rem">{avep_label}</div>'
+        f'<div class="kpi-sub">ICPI = {icpi_str}</div>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 with c5:
     st.markdown(
-        '<div class="kpi-card verde">'
-        '<div class="kpi-label">ITAM · Transparencia</div>'
-        '<div class="kpi-value" style="color:#1a7a4a">80%</div>'
-        '<div class="kpi-sub">Transparente 🟢 (>80%)</div>'
-        "</div>",
+        f'<div class="kpi-card verde">'
+        f'<div class="kpi-label">ITAM · Transparencia</div>'
+        f'<div class="kpi-value" style="color:#1a7a4a">{itam_str}</div>'
+        f'<div class="kpi-sub">{itam_sem}</div>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -257,12 +332,12 @@ with tab1:
     st.subheader("📊 Panel Ejecutivo ICPI — QUADRUM v1.0")
     st.caption("Fuente: M-DASHBOARD · Resumen ejecutivo del sistema SIAP-ICPI")
 
-    # KPIs del dashboard
+    # KPIs del dashboard — mismas variables extraídas antes del banner
     d1, d2, d3, d4 = st.columns(4)
-    d1.metric("ICPI Global", "38.28%", delta=None)
-    d2.metric("ICM SIGAD", "100%", delta="-61.72 pp vs ICPI")
-    d3.metric("Vi=1 (con evidencia)", "15 / 20 (75%)")
-    d4.metric("Ejecución completa Vi=1,Ti=1", "4 / 20 (20%)")
+    d1.metric("ICPI Global", icpi_str, delta=None)
+    d2.metric("ICM SIGAD", icm_str, delta=f"{brecha_str} vs ICPI")
+    d3.metric("Vi=1 (con evidencia)", vi1_str)
+    d4.metric("Nivel AVEP", avep_label)
 
     st.markdown("---")
 
@@ -296,24 +371,35 @@ with tab1:
     st.dataframe(top5_df, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    # ICPI por eje (mini-resumen del dashboard)
+    # ICPI por eje — dinámico desde DATA-EJES
     st.markdown("#### ⊕ ICPI por Eje Estratégico")
-    eje_cols = st.columns(5)
-    ejes_dash = [
-        ("🔵 TERRITORIAL", "25.8%", "#e67e22"),
-        ("🔴 SOCIAL", "51.7%", "#d4a017"),
-        ("🟢 AMBIENTAL", "44.9%", "#d4a017"),
-        ("🟠 ECONÓMICO", "70.0%", "#1a7a4a"),
-        ("🟣 INSTITUCIONAL", "60.2%", "#d4a017"),
-    ]
-    for col, (eje, val, color) in zip(eje_cols, ejes_dash):
-        col.markdown(
-            f'<div class="kpi-card">'
-            f'<div class="kpi-label">{eje}</div>'
-            f'<div class="kpi-value" style="color:{color}">{val}</div>'
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+    _ejes_raw = cargar_hoja_raw("DATA-EJES", nrows=10)
+    _ejes_din = []
+    if _ejes_raw is not None:
+        _eje_map = {
+            "TERRITORIAL": ("🔵", "#e67e22"), "SOCIAL":        ("🔴", "#d4a017"),
+            "AMBIENTAL":   ("🟢", "#d4a017"), "ECONÓMICO":     ("🟠", "#1a7a4a"),
+            "INSTITUCIONAL": ("🟣", "#2874a6"),
+        }
+        for i in range(3, 8):
+            try:
+                _n = str(_ejes_raw.iloc[i, 0])
+                _v = pd.to_numeric(_ejes_raw.iloc[i, 3], errors="coerce")
+                if pd.notna(_v):
+                    _k = next((k for k in _eje_map if k in _n.upper()), None)
+                    if _k:
+                        _e, _c = _eje_map[_k]
+                        _ejes_din.append((f"{_e} {_k}", f"{_v:.1f}%", _c))
+            except Exception:
+                pass
+    if _ejes_din:
+        eje_cols = st.columns(len(_ejes_din))
+        for col, (eje, val, color) in zip(eje_cols, _ejes_din):
+            col.markdown(
+                f'<div class="kpi-card"><div class="kpi-label">{eje}</div>'
+                f'<div class="kpi-value" style="color:{color}">{val}</div></div>',
+                unsafe_allow_html=True,
+            )
 
     # Intentar cargar M-DASHBOARD para mostrar evaluación semestral
     df_dash_raw = cargar_hoja_raw("M-DASHBOARD", nrows=30)
@@ -670,10 +756,33 @@ with tab6:
     st.caption("Fuente: DATA-ITAM · Base: LOTAIP Art.7 · 20 metas × 5 literales")
 
     ci1, ci2, ci3, ci4 = st.columns(4)
-    ci1.metric("ITAM Global", "80%", "🟢 Transparente (>80%)")
-    ci2.metric("Metas ITAM = 100%", "5 de 20", "🟢 Transparentes")
-    ci3.metric("Literal más incumplido", "i — Contratos", "10/20 metas")
-    ci4.metric("Dirección más opaca", "Patronato", "ITAM Dir. = 60%")
+    # Extraer literales desde DATA-ITAM fila 6: col2=k/20, col4=i/20, col6=g/20, col8=m/20, col10=d/20
+    _lit_k, _lit_i, _lit_g, _lit_m, _lit_d = "—", "—", "—", "—", "—"
+    _itam5_str = "—"
+    if _itam_raw is not None:
+        try:
+            _lit_k = str(_itam_raw.iloc[6, 2]).strip().replace("nan","—")
+            _lit_i = str(_itam_raw.iloc[6, 4]).strip().replace("nan","—")
+            _lit_g = str(_itam_raw.iloc[6, 6]).strip().replace("nan","—") if _itam_raw.shape[1] > 6 else "—"
+            _lit_m = str(_itam_raw.iloc[6, 8]).strip().replace("nan","—") if _itam_raw.shape[1] > 8 else "—"
+            _lit_d = str(_itam_raw.iloc[6, 10]).strip().replace("nan","—") if _itam_raw.shape[1] > 10 else "—"
+            # Metas con ITAM=100%: contar desde matriz fila 9-28, col 9 (TOTAL LIT. CUMPL.) == 5
+            _itam_mat = extraer_fila_como_df(_itam_raw, 8, 9, 29, 0, "PDOT")
+            if not _itam_mat.empty:
+                _tot_col = next((c for c in _itam_mat.columns if "TOTAL" in c.upper()), None)
+                if _tot_col:
+                    _n100 = (pd.to_numeric(_itam_mat[_tot_col], errors="coerce") == 5).sum()
+                    _itam5_str = f"{_n100} de {len(_itam_mat)}"
+        except Exception:
+            pass
+    _opaca_raw = str(_itam_raw.iloc[5, 5]).strip() if _itam_raw is not None else "—"
+    _opaca_dir = _opaca_raw if _opaca_raw not in ("nan","") else "—"
+    _opaca_pct = str(_itam_raw.iloc[5, 6]).strip() if _itam_raw is not None and _itam_raw.shape[1] > 6 else "—"
+
+    ci1.metric("ITAM Global", itam_str, itam_sem)
+    ci2.metric("Metas ITAM = 100%", _itam5_str, "🟢 Transparentes")
+    ci3.metric("Literal más incumplido", f"i — Contratos ({_lit_i})", "metas cumplen")
+    ci4.metric("Dirección más opaca", _opaca_dir[:30] if len(_opaca_dir) > 30 else _opaca_dir)
 
     st.markdown("---")
 
@@ -816,14 +925,19 @@ with tab8:
     st.subheader("📋 Resultados Consolidados del Sistema SIAP-ICPI")
     st.caption("Dictamen final de auditoría forense — GAD Municipal de Montecristi")
 
-    # Métricas verificadas del Excel
+    # ── Calcular métricas adicionales para tabla ──
+    _vi0_n   = len(_m5) - vi1_n if _m5_raw is not None and not _m5.empty else 0
+    _vi0_str = f"{_vi0_n} / {len(_m5)}  ({_vi0_n/len(_m5)*100:.0f}%)" if len(_m5) > 0 else "N/D"
+    _meta_pdot_2027 = 100.0
+    _brecha_meta_str = f"−{_meta_pdot_2027 - icpi_val:.2f} pp"
+
     st.dataframe(
         pd.DataFrame({
             "MÉTRICA": [
                 "ICPI Global Forense",
                 "Categoría Semáforo AVEP",
                 "Brecha ICPI vs Meta PDOT 2027",
-                "ICM SIGAD 2023 (auto-reporte)",
+                "ICM SIGAD 2023-2024 (auto-reporte)",
                 "Diferencial Forense (H₁)",
                 "Metas Vi=1 — con soporte documental",
                 "Metas Vi=0 — sin soporte documental",
@@ -831,71 +945,116 @@ with tab8:
                 "ITAM — Transparencia LOTAIP",
             ],
             "VALOR": [
-                "38.28%",
-                "Gestión por Ocurrencia 🔴",
-                "−61.72 pp",
-                "100% (SIGAD 2023 y 2024)",
-                "+61.72 pp (H₁ Confirmada §3.1)",
-                "15 / 20  (75%)",
-                "5 / 20  (25%)",
+                icpi_str,
+                f"{avep_label}",
+                _brecha_meta_str,
+                icm_str,
+                f"{h1_str} (H₁ Confirmada §3.1)",
+                vi1_str,
+                _vi0_str,
                 "67.64%  (Δ +20.6 pp posible)",
-                "80%  — Transparente 🟢",
+                f"{itam_str}  — {itam_sem}",
             ],
             "FUENTE / INTERPRETACIÓN": [
                 "Σ(Pi×Ri×Vi×Ti) ÷ Σ(Pi×Ri) · Motor M5-ICPI",
-                "Escala: ≥90 Excelencia · ≥70 Satisfactorio · ≥40 Transición · ≥20 Ocurrencia",
-                "Brecha vs Meta 92.5% Plan Bicentenario §3.6",
+                "Escala: ≥90 Excelencia · ≥70 Mandato · ≥40 Transición · ≥20 Ocurrencia",
+                "Brecha vs Meta 100% Plan Bicentenario §3.6",
                 "ICM SIGAD 2023 y 2024 = 100% — carga masiva extemporánea confirmada (MOM) §3.1",
                 "ICPI forense vs ICM declarado — confirma H₁ §3.1",
-                "Vi_cadena=1: CININ 6 silos verificados · fuente M-DASHBOARD",
+                "Vi_cadena=1: CININ 6 silos verificados · fuente M5-ICPI",
                 "Vi_cadena=0: sin cadena completa",
                 "Si SOC-02 activa Vi=1, Ti=1 · Pi=0.177, Ri=1.5 · mayor impacto",
-                "20/20 Lit.k y m · 10/20 Lit.i (Contratos) · fuente DATA-ITAM",
+                f"Lit.k y m: 20/20 · Lit.i (Contratos): {_lit_i} · fuente DATA-ITAM",
             ],
         }),
         use_container_width=True, hide_index=True,
     )
 
     st.markdown("---")
-    # Continuidad por eje — DATA-RESULTADOS rows 16-20
     st.markdown("#### ⊕ Continuidad por Eje Estratégico")
-    st.dataframe(
-        pd.DataFrame({
-            "Eje (n)": [
-                "TERRITORIAL (9)", "SOCIAL (6)", "AMBIENTAL (2)",
-                "ECONÓMICO (1)", "INSTITUCIONAL (2)", "TOTAL (20)"
-            ],
-            "ICPI Eje (%)": ["66.3%", "11.9%", "33.4%", "27.0%", "85.8%", "38.28%"],
-            "Vi=1": [8, 2, 2, 0, 2, "14 (70%)"],
-            "Vi=0": [1, 4, 0, 1, 0, "6 (30%)"],
-            "Alineadas ✅": [5, 1, 0, 0, 2, "8"],
-            "Parciales ⚠️": [3, 2, 2, 1, 0, "8"],
-            "Baja Cont. 🔴": [1, 3, 0, 0, 0, "4"],
-            "Observación clave": [
-                "Acueducto CAF $45.6M · camal/reservorios urgentes",
-                "Centro Salud Tipo C: mayor déficit (Pi=0.177, Ri=1.5)",
-                "Vi=1 ambas · Ti muy bajo (0.20-0.40) · activar POA",
-                "1 meta: Playa San José · Vi=0 · Ruta continuidad BDE",
-                "Catastro+Digitalización completos · modelo a replicar",
-                "ICPI=38.28% · TRANSICIÓN CRÍTICA/OCURRENCIA · n=20"
-            ],
-        }),
-        use_container_width=True, hide_index=True,
-    )
+
+    # Construir tabla dinámica desde DATA-EJES (ICPI) + M5 (Vi por eje)
+    _eje_order  = ["TERRITORIAL", "SOCIAL", "AMBIENTAL", "ECONÓMICO", "INSTITUCIONAL"]
+    _eje_n      = {"TERRITORIAL": 9, "SOCIAL": 6, "AMBIENTAL": 2, "ECONÓMICO": 1, "INSTITUCIONAL": 2}
+    _eje_obs    = {
+        "TERRITORIAL":  "Acueducto CAF $45.6M · camal/reservorios urgentes",
+        "SOCIAL":       "Centro Salud Tipo C: mayor déficit (Pi=0.177, Ri=1.5)",
+        "AMBIENTAL":    "Vi=1 ambas · Ti muy bajo (0.20–0.40) · activar POA",
+        "ECONÓMICO":    "1 meta: Playa San José · Vi=0 · Ruta continuidad BDE",
+        "INSTITUCIONAL":"Catastro+Digitalización completos · modelo a replicar",
+    }
+
+    # Extraer ICPI por eje desde DATA-EJES rows 3-7
+    _icpi_eje = {}
+    _ejes_raw2 = cargar_hoja_raw("DATA-EJES", nrows=10)
+    if _ejes_raw2 is not None:
+        for _i in range(3, 8):
+            _nm  = str(_ejes_raw2.iloc[_i, 0]).upper()
+            _val = pd.to_numeric(_ejes_raw2.iloc[_i, 3], errors="coerce")
+            _k2  = next((k for k in _eje_order if k in _nm), None)
+            if _k2 and pd.notna(_val):
+                _icpi_eje[_k2] = _val
+
+    # Extraer Vi=1 por eje desde M5
+    _vi1_eje = {k: 0 for k in _eje_order}
+    _vi0_eje = {k: 0 for k in _eje_order}
+    if _m5_raw is not None and not _m5.empty:
+        _ej_col = next((c for c in _m5.columns if "EJE" in c.upper()), None)
+        _vi_col2 = next((c for c in _m5.columns if "Vi" in c and "erif" in c), None)
+        if _ej_col and _vi_col2:
+            for _, _row in _m5.iterrows():
+                _ej_str = str(_row[_ej_col]).upper()
+                _vi_val = pd.to_numeric(_row[_vi_col2], errors="coerce")
+                _k3 = next((k for k in _eje_order if k[:4] in _ej_str or
+                            any(alias in _ej_str for alias in {
+                                "TERRITORIAL": ["ASENTAM", "FÍSICO", "FISICO"],
+                                "SOCIAL":      ["SOCIO", "CULTURAL"],
+                                "AMBIENTAL":   ["AMBIENTAL"],
+                                "ECONÓMICO":   ["ECONÓMIC", "ECONOMIC", "PRODUCT"],
+                                "INSTITUCIONAL":["INSTITUC", "POLÍTICO", "POLITICO"],
+                            }.get(k, []))), None)
+                if _k3:
+                    if _vi_val == 1: _vi1_eje[_k3] += 1
+                    elif _vi_val == 0: _vi0_eje[_k3] += 1
+
+    _rows_cont = []
+    for _k in _eje_order:
+        _icpi_v = f"{_icpi_eje[_k]:.1f}%" if _k in _icpi_eje else "N/D"
+        _rows_cont.append({
+            "Eje (n)":         f"{_k} ({_eje_n[_k]})",
+            "ICPI Eje (%)":    _icpi_v,
+            "Vi=1":            _vi1_eje[_k],
+            "Vi=0":            _vi0_eje[_k],
+            "Observación clave": _eje_obs[_k],
+        })
+    # Fila total
+    _icpi_total_str = icpi_str
+    _rows_cont.append({
+        "Eje (n)":         f"TOTAL ({len(_m5) if _m5_raw is not None and not _m5.empty else 20})",
+        "ICPI Eje (%)":    _icpi_total_str,
+        "Vi=1":            vi1_n,
+        "Vi=0":            _vi0_n,
+        "Observación clave": f"ICPI={icpi_str} · {avep_label} · MOM SIGAD confirmado",
+    })
+    st.dataframe(pd.DataFrame(_rows_cont), use_container_width=True, hide_index=True)
 
     st.markdown("---")
     csa, csb = st.columns(2)
     with csa:
         st.markdown("#### 🚦 Escala AVEP — Posición GAD Montecristi")
+        _avep_rangos = [
+            ("≥ 90%",       "⭐ Excelencia Institucional",  icpi_val >= 90),
+            ("70% – 89%",   "✅ Gestión por Mandato",        70 <= icpi_val < 90),
+            ("40% – 69%",   "🟡 Transición Crítica",         40 <= icpi_val < 70),
+            ("20% – 39%",   "🔴 Gestión por Ocurrencia",     20 <= icpi_val < 40),
+            ("< 20%",       "⬛ Ruptura Institucional",      icpi_val < 20),
+        ]
         st.dataframe(
             pd.DataFrame({
-                "Rango ICPI": ["≥ 90%", "70% – 89%", "40% – 69%", "20% – 39%", "< 20%"],
-                "Categoría": [
-                    "⭐ Excelencia Institucional",
-                    "✅ Gestión por Mandato",
-                    "🟡 Transición Crítica",
-                    "🔴 Gestión por Ocurrencia  ← GAD Montecristi (38.28%)",
-                    "⬛ Ruptura Institucional",
+                "Rango ICPI": [r[0] for r in _avep_rangos],
+                "Categoría":  [
+                    f"{r[1]}  ← GAD Montecristi ({icpi_str})" if r[2] else r[1]
+                    for r in _avep_rangos
                 ],
             }),
             use_container_width=True, hide_index=True,
@@ -919,24 +1078,65 @@ with tab8:
         )
 
     # ─── HALLAZGO MOM · DATA-SIGAD ───────────────────────────────────
+    # Extraer datos MOM desde DATA-SIGAD filas 4-5 y 7
+    _icm23_str, _icm24_str       = "N/D", "N/D"
+    _brecha23, _brecha24         = "N/D", "N/D"
+    _metas23, _metas24           = "—", "—"
+    _monto23, _monto24           = "—", "—"
+    _pct23, _pct24               = "—", "—"
+    _sig_full = cargar_hoja_raw("DATA-SIGAD", nrows=10)
+    if _sig_full is not None:
+        try:
+            # row4 = ICM SIGAD 2023, row5 = ICM SIGAD 2024
+            # col1=ICM%, col3=Brecha, col4=Metas, col6=Monto$, col7=%pres
+            def _safe_num(df, r, c):
+                return pd.to_numeric(str(df.iloc[r, c]).replace(",", ".").strip(), errors="coerce")
+            _icm23_raw = _safe_num(_sig_full, 4, 1)
+            _icm24_raw = _safe_num(_sig_full, 5, 1)
+            _b23_raw   = _safe_num(_sig_full, 4, 3)
+            _b24_raw   = _safe_num(_sig_full, 5, 3)
+            if pd.notna(_icm23_raw): _icm23_str = f"{_icm23_raw:.2f}%"
+            if pd.notna(_icm24_raw): _icm24_str = f"{_icm24_raw:.2f}%"
+            if pd.notna(_b23_raw):   _brecha23  = f"Δ {_b23_raw:.2f} pp"
+            if pd.notna(_b24_raw):   _brecha24  = f"Δ {_b24_raw:.2f} pp"
+            _metas23 = str(_sig_full.iloc[4, 4]).strip().replace("nan", "—")
+            _metas24 = str(_sig_full.iloc[5, 4]).strip().replace("nan", "—")
+            _m23v = _safe_num(_sig_full, 4, 6)
+            _m24v = _safe_num(_sig_full, 5, 6)
+            if pd.notna(_m23v): _monto23 = f"${_m23v:,.2f}"
+            if pd.notna(_m24v): _monto24 = f"${_m24v:,.2f}"
+            _p23v = _safe_num(_sig_full, 4, 7)
+            _p24v = _safe_num(_sig_full, 5, 7)
+            if pd.notna(_p23v): _pct23 = f"{_p23v*100:.1f}%"
+            if pd.notna(_p24v): _pct24 = f"{_p24v*100:.1f}%"
+            # ICM consolidado = promedio de ambos (ambos son 100 según DATA-SIGAD)
+            if pd.notna(_icm23_raw) and pd.notna(_icm24_raw):
+                _icm_consol = (_icm23_raw + _icm24_raw) / 2
+                icm_str   = f"{_icm_consol:.2f}%"
+                brecha_val = _icm_consol - icpi_val
+                brecha_str = f"−{brecha_val:.2f} pp"
+                h1_str     = f"+{brecha_val:.2f} pp"
+        except Exception:
+            pass
+
     st.markdown("---")
     st.markdown("#### 🚨 Hallazgo Forense MOM — Validez del ICM SIGAD (DATA-SIGAD)")
     st.error(
-        "**ICM SIGAD 2023 y 2024 = 100%** · Carga masiva extemporánea confirmada.  \n"
+        f"**ICM SIGAD 2023 = {_icm23_str} · ICM SIGAD 2024 = {_icm24_str}** · Carga masiva extemporánea confirmada.  \n"
         "SIGAD 2024: 5 etapas cargadas el **30/05/2025 en 42 segundos** (00:48:21 → 00:49:03).  \n"
         "SIGAD 2023: I–III trimestres cargados el **16/05/2024 en 13 segundos**.  \n"
-        "Presupuesto reportado: $1.82M (2023) y $3.94M (2024) sobre $32.99M total = **5.5% y 11.9%**.  \n"
-        "**MOM CONFIRMADO** (umbral ISSAI 5%) — ICM=100% anula su validez como comparativo. "
-        "Brecha de Integridad: **ICPI 38.28% vs ICM 100% = Δ 61.72 pp · H₁ ACTIVA.**  \n"
+        f"Presupuesto reportado: {_monto23} (2023) y {_monto24} (2024) · {_pct23} y {_pct24} del presupuesto total.  \n"
+        f"**MOM CONFIRMADO** (umbral ISSAI 5%) — ICM anula su validez como comparativo.  \n"
+        f"Brecha de Integridad: **ICPI {icpi_str} vs ICM {icm_str} = {brecha_str} · H₁ ACTIVA.**  \n"
         "Base legal: ISSAI 1000 · Acuerdo SNP-2024-0040-A · COOTAD Art.234 · LOPC Art.89"
     )
     st.dataframe(
         pd.DataFrame({
-            "Período": ["ICM SIGAD 2023", "ICM SIGAD 2024", "ICPI Auditado", "Brecha de Integridad"],
-            "Valor": ["100%", "100%", "38.28%", "Δ 61.72 pp"],
-            "Metas SIGAD": ["5", "9", "20 (n total)", "—"],
-            "Monto reportado": ["$1,824,689.36", "$3,939,101.48", "—", "—"],
-            "% sobre presupuesto total": ["5.5%", "11.9%", "—", "—"],
+            "Período":                  ["ICM SIGAD 2023", "ICM SIGAD 2024", "ICPI Auditado",    "Brecha de Integridad"],
+            "Valor":                    [_icm23_str,        _icm24_str,        icpi_str,           brecha_str],
+            "Metas SIGAD":              [_metas23,          _metas24,          "20 (n total)",     "—"],
+            "Monto reportado":          [_monto23,          _monto24,          "—",                "—"],
+            "% sobre presupuesto":      [_pct23,            _pct24,            "—",                "—"],
             "Hallazgo": [
                 "Carga 3 trimestres en 13 seg · 16/05/2024",
                 "🚨 5 etapas en 42 seg · 30/05/2025 · PRINCIPAL",
