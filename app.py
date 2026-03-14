@@ -175,7 +175,7 @@ st.markdown(
 # ═══════════════════════════════════════════════════════
 # KPIs — VALORES ACTUALIZADOS DEL EXCEL
 # ICPI Global: 38.28% (M5-ICPI row28)
-# ICM SIGAD: 92.25% (DATA-RESULTADOS)
+# ICM SIGAD: 100% (DATA-SIGAD 2023 y 2024 — ambos períodos)
 # Vi=1: 15/20 (M-DASHBOARD row11)
 # ITAM: 80% (DATA-ITAM row5)
 # Nivel AVEP: Gestión por Ocurrencia (M-DASHBOARD row4)
@@ -200,8 +200,8 @@ with c2:
     st.markdown(
         '<div class="kpi-card rojo">'
         '<div class="kpi-label">ICM SIGAD Auto-reporte</div>'
-        '<div class="kpi-value" style="color:#c0392b">92.25%</div>'
-        '<div class="kpi-sub">Diferencial: +53.97 pp</div>'
+        '<div class="kpi-value" style="color:#c0392b">100%</div>'
+        '<div class="kpi-sub">Diferencial: +61.72 pp</div>'
         "</div>",
         unsafe_allow_html=True,
     )
@@ -209,7 +209,7 @@ with c3:
     st.markdown(
         '<div class="kpi-card naranja">'
         '<div class="kpi-label">Brecha ICPI vs SIGAD</div>'
-        '<div class="kpi-value" style="color:#e67e22">−53.97 pp</div>'
+        '<div class="kpi-value" style="color:#e67e22">−61.72 pp</div>'
         '<div class="kpi-sub">H₁ Confirmada §3.1</div>'
         "</div>",
         unsafe_allow_html=True,
@@ -260,7 +260,7 @@ with tab1:
     # KPIs del dashboard
     d1, d2, d3, d4 = st.columns(4)
     d1.metric("ICPI Global", "38.28%", delta=None)
-    d2.metric("ICM SIGAD", "92.25%", delta="-53.97 pp vs ICPI")
+    d2.metric("ICM SIGAD", "100%", delta="-61.72 pp vs ICPI")
     d3.metric("Vi=1 (con evidencia)", "15 / 20 (75%)")
     d4.metric("Ejecución completa Vi=1,Ti=1", "4 / 20 (20%)")
 
@@ -834,8 +834,8 @@ with tab8:
                 "38.28%",
                 "Gestión por Ocurrencia 🔴",
                 "−61.72 pp",
-                "92.25%",
-                "+53.97 pp (H₁ Confirmada §3.1)",
+                "100% (SIGAD 2023 y 2024)",
+                "+61.72 pp (H₁ Confirmada §3.1)",
                 "15 / 20  (75%)",
                 "5 / 20  (25%)",
                 "67.64%  (Δ +20.6 pp posible)",
@@ -845,7 +845,7 @@ with tab8:
                 "Σ(Pi×Ri×Vi×Ti) ÷ Σ(Pi×Ri) · Motor M5-ICPI",
                 "Escala: ≥90 Excelencia · ≥70 Satisfactorio · ≥40 Transición · ≥20 Ocurrencia",
                 "Brecha vs Meta 92.5% Plan Bicentenario §3.6",
-                "Auto-reporte SIGAD — sobrestimación vs ICPI forense",
+                "ICM SIGAD 2023 y 2024 = 100% — carga masiva extemporánea confirmada (MOM) §3.1",
                 "ICPI forense vs ICM declarado — confirma H₁ §3.1",
                 "Vi_cadena=1: CININ 6 silos verificados · fuente M-DASHBOARD",
                 "Vi_cadena=0: sin cadena completa",
@@ -917,6 +917,35 @@ with tab8:
             }),
             use_container_width=True, hide_index=True,
         )
+
+    # ─── HALLAZGO MOM · DATA-SIGAD ───────────────────────────────────
+    st.markdown("---")
+    st.markdown("#### 🚨 Hallazgo Forense MOM — Validez del ICM SIGAD (DATA-SIGAD)")
+    st.error(
+        "**ICM SIGAD 2023 y 2024 = 100%** · Carga masiva extemporánea confirmada.  \n"
+        "SIGAD 2024: 5 etapas cargadas el **30/05/2025 en 42 segundos** (00:48:21 → 00:49:03).  \n"
+        "SIGAD 2023: I–III trimestres cargados el **16/05/2024 en 13 segundos**.  \n"
+        "Presupuesto reportado: $1.82M (2023) y $3.94M (2024) sobre $32.99M total = **5.5% y 11.9%**.  \n"
+        "**MOM CONFIRMADO** (umbral ISSAI 5%) — ICM=100% anula su validez como comparativo. "
+        "Brecha de Integridad: **ICPI 38.28% vs ICM 100% = Δ 61.72 pp · H₁ ACTIVA.**  \n"
+        "Base legal: ISSAI 1000 · Acuerdo SNP-2024-0040-A · COOTAD Art.234 · LOPC Art.89"
+    )
+    st.dataframe(
+        pd.DataFrame({
+            "Período": ["ICM SIGAD 2023", "ICM SIGAD 2024", "ICPI Auditado", "Brecha de Integridad"],
+            "Valor": ["100%", "100%", "38.28%", "Δ 61.72 pp"],
+            "Metas SIGAD": ["5", "9", "20 (n total)", "—"],
+            "Monto reportado": ["$1,824,689.36", "$3,939,101.48", "—", "—"],
+            "% sobre presupuesto total": ["5.5%", "11.9%", "—", "—"],
+            "Hallazgo": [
+                "Carga 3 trimestres en 13 seg · 16/05/2024",
+                "🚨 5 etapas en 42 seg · 30/05/2025 · PRINCIPAL",
+                "Motor SIAP-ICPI verificado §3.4",
+                "H₁ Confirmada · MOM · ISSAI 1000",
+            ],
+        }),
+        use_container_width=True, hide_index=True,
+    )
 
     # Evaluación semestral (SUPPORT-SEM)
     st.markdown("---")
